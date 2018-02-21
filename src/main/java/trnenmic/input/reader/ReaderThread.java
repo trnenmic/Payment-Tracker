@@ -8,14 +8,13 @@ import trnenmic.output.printer.DefaultConsolePrinter;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class ReaderThread extends Thread {
 
-    private AtomicBoolean shouldExit;
     private InputDBCallback dbCallback;
+    private boolean shouldExit = false;
     private File inputFile;
     private DefaultConsolePrinter printer;
     private BufferedReader reader;
@@ -23,10 +22,9 @@ public class ReaderThread extends Thread {
     private String FILE_NAME = "";
     private boolean IS_DEBUG = false;
 
-    public ReaderThread(DefaultConsolePrinter printer, AtomicBoolean shouldExit, InputDBCallback dbCallback, String[] args) {
+    public ReaderThread(DefaultConsolePrinter printer, InputDBCallback dbCallback, String[] args) {
         this.printer = printer;
         this.dbCallback = dbCallback;
-        this.shouldExit = shouldExit;
         if (args.length > 0) {
             inputFile = new File(args[0]);
         }
@@ -44,6 +42,8 @@ public class ReaderThread extends Thread {
 
             //Reads users' input
             readConsoleInput();
+        } catch (InterruptedException e) {
+            return;
         } catch (Exception e) {
             printer.print("-- Ups. Something went wrong. Please contact an IT guy. --");
             LOGGER.log(Level.SEVERE, e.getMessage(), e);
@@ -73,10 +73,10 @@ public class ReaderThread extends Thread {
 
     }
 
-    private void readConsoleInput() throws IOException {
+    private void readConsoleInput() throws IOException, InterruptedException {
         reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
         int constantLineNumber = 0;
-        while (!shouldExit.get()) {
+        while (!shouldExit) {
             String line = reader.readLine();
             parse(line, constantLineNumber);
         }
@@ -94,8 +94,9 @@ public class ReaderThread extends Thread {
                     }
                     break;
                 case QUIT:
-                    if (lineNumber != 0) {
-                        this.shouldExit.set(true);
+                    if (lineNumber == 0) { // Console reading
+                        dbCallback.interruptPrinting();
+                        shouldExit = true;
                     }
                     break;
                 case FORMAT_ERROR:

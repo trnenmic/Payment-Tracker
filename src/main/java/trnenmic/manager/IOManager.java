@@ -7,15 +7,12 @@ import trnenmic.output.PrinterThread;
 import trnenmic.output.printer.ConsolePrinterFactory;
 import trnenmic.output.printer.DefaultConsolePrinter;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 public class IOManager {
 
-    private AtomicBoolean shouldExit;
     private String[] args;
 
-    private ReaderThread readerThread;
-    private PrinterThread printerThread;
+    private Thread readerThread;
+    private Thread printerThread;
     private DefaultConsolePrinter printer;
     private MainManager manager;
 
@@ -32,16 +29,15 @@ public class IOManager {
     }
 
     private void init() {
-        shouldExit = new AtomicBoolean(false);
         printer = ConsolePrinterFactory.createDefaultConsolePrinter();
-        readerThread = new ReaderThread(printer, shouldExit, new InputDBCallback(this), args);
-        printerThread = new PrinterThread(printer, shouldExit, new OutputDBCallback(this));
+        ReaderThread rThread = new ReaderThread(printer, new InputDBCallback(this), args);
+        PrinterThread pThread = new PrinterThread(printer, new OutputDBCallback(this));
 
-        Thread t1 = new Thread(readerThread);
-        Thread t2 = new Thread(printerThread);
+        printerThread = new Thread(pThread);
+        readerThread = new Thread(rThread);
 
-        t1.start();
-        t2.start();
+        printerThread.start();
+        readerThread.start();
     }
 
     public void increaseAmount(String code, long amount) {
@@ -58,5 +54,10 @@ public class IOManager {
 
     public void print(String message) {
         printer.print(message);
+    }
+
+    public void shutDown() {
+        printerThread.interrupt();
+        readerThread.interrupt();
     }
 }

@@ -17,4 +17,8 @@ public class InputDBCallback {
     public void putRate(String codeFrom, String codeTo, double rate) {
         manager.putRate(codeFrom, codeTo, rate);
     }
+
+    public void interruptPrinting() {
+        manager.shutDown();
+    }
 }

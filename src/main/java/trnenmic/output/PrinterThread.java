@@ -3,7 +3,6 @@ package trnenmic.output;
 import trnenmic.manager.callback.OutputDBCallback;
 import trnenmic.output.printer.DefaultConsolePrinter;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -11,24 +10,22 @@ import static java.lang.Thread.sleep;
 
 public class PrinterThread implements Runnable {
 
-    private AtomicBoolean shouldExit;
     private OutputDBCallback retrieveCallback;
     private DefaultConsolePrinter printer;
 
     private final static Logger LOGGER = Logger.getLogger(PrinterThread.class.getName());
     private static final int SLEEP_TIME = 60;
-    private static final int AWAKE_COEF = 5;
+    private static final int AWAKE_COEF = 1;
     private static final String EXCHANGE_CODE = "USD";
 
-    public PrinterThread(DefaultConsolePrinter printer, AtomicBoolean shouldExit, OutputDBCallback retrieveCallback) {
+    public PrinterThread(DefaultConsolePrinter printer, OutputDBCallback retrieveCallback) {
         this.printer = printer;
         this.retrieveCallback = retrieveCallback;
-        this.shouldExit = shouldExit;
     }
 
     public void run() {
         try {
-            while (!shouldExit.get()) {
+            while (true) {
 
                 //Printing the content of DB
                 String message = retrieveCallback.retrieveContent(EXCHANGE_CODE);
@@ -37,15 +34,10 @@ public class PrinterThread implements Runnable {
                 }
                 printer.print(message);
 
-                //Awaking from time to time to be able to react quickly if 'quit' command came
-                for (int i = 0; i < AWAKE_COEF * SLEEP_TIME; i++) {
-                    if (shouldExit.get()) {
-                        break;
-                    } else {
-                        sleep(1000 / AWAKE_COEF);
-                    }
-                }
+                sleep(1000 * SLEEP_TIME);
             }
+        } catch (InterruptedException e) {
+            printer.print("-- Quitting the app --");
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, e.getMessage(), e);
         }
