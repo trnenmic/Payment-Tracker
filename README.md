@@ -43,7 +43,12 @@ Allow each currency to have the exchange rate compared to USD configured. When y
 
 ### Assumptions
 
-//TODO - will be added soon
+* App will inform user about the wrong input with quote '-- Wrong input formatting. Correct example: 'CZK 1000' --', but it won't quit.
+* Inserted values are longs, i.e. not floating point values.
+* The content of DB being printed will be sorted alphabetically.
+* Exchange rate values are saved in a file. Lines are formatted like this 'USD RMB 6.35', meaning the exchange rate from USD to RMB is 6.35.
+* If the database is empty (i.e. there are no entries or there are just entries with 0 amount), '-- Empty Database --' will be printed.
+* If user types 'quit' (case-sensitive), app will write '-- Quitting the app --' and quit.
 
 ## How to run
 
