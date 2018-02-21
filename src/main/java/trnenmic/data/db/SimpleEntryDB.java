@@ -11,11 +11,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class SimpleEntryDB implements DefaultEntryDB {
 
     private HashMap<String, DefaultCurrencyEntry> map;
     private DefaultDataValidator validator;
+    private ReadWriteLock lock = new ReentrantReadWriteLock();
 
     protected SimpleEntryDB() {
         map = new HashMap<>();
@@ -36,13 +39,19 @@ public class SimpleEntryDB implements DefaultEntryDB {
             throw new WrongFormatException("Wrong format of currency code.");
         }
 
-        DefaultCurrencyEntry currencyEntry = map.get(code);
-        if (currencyEntry == null) {
-            currencyEntry = CurrencyEntryFactory.createDefault(value);
-            map.put(code, currencyEntry);
-        } else {
-            currencyEntry.add(value);
+        lock.writeLock().lock();
+        try {
+            DefaultCurrencyEntry currencyEntry = map.get(code);
+            if (currencyEntry == null) {
+                currencyEntry = CurrencyEntryFactory.createDefault(value);
+                map.put(code, currencyEntry);
+            } else {
+                currencyEntry.add(value);
+            }
+        } finally {
+            lock.writeLock().lock();
         }
+
     }
 
     /**
@@ -75,21 +84,27 @@ public class SimpleEntryDB implements DefaultEntryDB {
         ArrayList<String> ordered = new ArrayList<>();
 
         //Getting all entries from DB while converting them into formatted string
-        for (Map.Entry<String, DefaultCurrencyEntry> entry : map.entrySet()) {
-            String key = entry.getKey();
-            DefaultCurrencyEntry currencyEntry = entry.getValue();
-            if (currencyEntry.isReadable()) {
-                String exchange = "";
-                if (exchangePrintCode != null && !"".equals(exchangePrintCode)) {
-                    Double rate = currencyEntry.getExchangeRate(exchangePrintCode);
-                    if (rate != null) {
-                        rate *= currencyEntry.getCurrentAmount();
-                        exchange = " (" + exchangePrintCode + " " + DataUtils.round(rate, 2) + ")";
+        lock.readLock().lock();
+        try {
+            for (Map.Entry<String, DefaultCurrencyEntry> entry : map.entrySet()) {
+                String key = entry.getKey();
+                DefaultCurrencyEntry currencyEntry = entry.getValue();
+                if (currencyEntry.isReadable()) {
+                    String exchange = "";
+                    if (exchangePrintCode != null && !"".equals(exchangePrintCode)) {
+                        Double rate = currencyEntry.getExchangeRate(exchangePrintCode);
+                        if (rate != null) {
+                            rate *= currencyEntry.getCurrentAmount();
+                            exchange = " (" + exchangePrintCode + " " + DataUtils.round(rate, 2) + ")";
+                        }
                     }
+                    ordered.add(key + " " + currencyEntry.getCurrentAmount() + exchange + "\n");
                 }
-                ordered.add(key + " " + currencyEntry.getCurrentAmount() + exchange + "\n");
             }
+        } finally {
+            lock.readLock().unlock();
         }
+
 
         //Alphabetical sort of entries
         Collections.sort(ordered);
@@ -119,16 +134,20 @@ public class SimpleEntryDB implements DefaultEntryDB {
         DefaultCurrencyEntry currencyEntryTo = map.get(codeTo);
 
         //Creating 'empty' entries if they did not exist before
-        if (currencyEntryFrom == null) {
-            currencyEntryFrom = CurrencyEntryFactory.createDefault(0);
-            map.put(codeFrom, currencyEntryFrom);
+        lock.writeLock().lock();
+        try {
+            if (currencyEntryFrom == null) {
+                currencyEntryFrom = CurrencyEntryFactory.createDefault(0);
+                map.put(codeFrom, currencyEntryFrom);
+            }
+            if (currencyEntryTo == null) {
+                currencyEntryTo = CurrencyEntryFactory.createDefault(0);
+                map.put(codeTo, currencyEntryTo);
+            }
+            currencyEntryFrom.putExchangeRate(codeTo, rate);
+            currencyEntryTo.putExchangeRate(codeFrom, 1 / rate);
+        } finally {
+            lock.writeLock().unlock();
         }
-        if (currencyEntryTo == null) {
-            currencyEntryTo = CurrencyEntryFactory.createDefault(0);
-            map.put(codeTo, currencyEntryTo);
-        }
-
-        currencyEntryFrom.putExchangeRate(codeTo, rate);
-        currencyEntryTo.putExchangeRate(codeFrom, 1 / rate);
     }
 }
